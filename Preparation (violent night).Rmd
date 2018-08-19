@@ -1,0 +1,102 @@
+---
+title: "Data Preparation - Night"
+author: "Jingbo"
+date: "4/6/2018"
+output: html_document
+---
+
+```{r, echo = FALSE, include = FALSE}
+library(dplyr)
+library(moments)
+library(ROSE)
+library(ROCR)
+library(caret)
+```
+
+```{r}
+violent_night <- read.csv("VIOLENT CRIME_night.csv")
+# drop columns
+violent_night <- select(violent_night, -address, -Central_lon, -Central_lat)
+```
+
+```{r}
+# check variable skewness
+# abs value of skewness means highly skew
+for (i in 6:29){
+  if (abs(skewness(violent_night[,i])) > 1)
+    print(paste(names(violent_night)[i], ":", skewness(violent_night[,i])))
+}
+```
+
+```{r}
+# log transformation
+violent_night$Last_month <- log(violent_night$Last_month + 0.5) 
+violent_night$Previous_occured <- log(violent_night$Previous_occured + 0.001)
+violent_night$Adjacent_previous_occured <- log(violent_night$Adjacent_previous_occured + 0.001)
+violent_night$Last_occured <- log(violent_night$Last_occured + 0.5) 
+violent_night$Crime_density <- log(violent_night$Crime_density + 0.001) 
+violent_night$Total_density <- log(violent_night$Total_density)
+violent_night$Population..area. <- log(violent_night$Population..area.)
+violent_night$Housing..area. <- log(violent_night$Housing..area.)
+violent_night$Householder..area. <- log(violent_night$Householder..area. + 0.5)
+```
+
+```{r}
+# variable skewness after transformation
+for (i in 6:29){
+  if (abs(skewness(violent_night[,i])) > 1)
+    print(paste(names(violent_night)[i], ":", skewness(violent_night[,i])))
+}
+```
+
+
+```{r}
+# standardize
+for (i in 6:29){
+  violent_night[,i] <- 10*(violent_night[,i] - min(violent_night[,i]))/(max(violent_night[,i]) - min(violent_night[,i]))
+}
+```
+
+```{r}
+summary(violent_night)
+```
+
+```{r}
+# district indicators
+area <- c('BRONX', 'BROOKLYN', 'MANHATTAN', 'QUEENS')
+for (i in 1:4){
+  violent_night[,area[i]] <- as.integer(violent_night$District == area[i])
+}
+
+# month indicators
+month <- c('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV')
+for (i in 1:11){
+  violent_night[,month[i]] <- as.integer(violent_night$Month == month[i])
+}
+```
+
+
+```{r}
+summary(violent_night)
+```
+
+```{r}
+violent_night$Response <- as.factor(violent_night$Response)
+
+# data partition
+violent_night_test = subset(violent_night, Year == 2015 | Year == 2016)
+violent_night_train = subset(violent_night, Year != 2015 & Year != 2016)
+```
+
+```{r}
+# under sampling on train set
+table(violent_night_train$Response)
+violent_night_train <- ovun.sample(Response ~ ., data = violent_night_train, method = "under", 
+                                 N = 484944, seed = 1)$data
+
+write.csv(violent_night_test, 'violent_night_test.csv', row.names = FALSE)
+write.csv(violent_night_train, 'violent_night_train.csv', row.names = FALSE)
+
+```
+
+
